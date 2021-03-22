@@ -32,4 +32,5 @@ public:
 	void Scan_System_Initialization();
 	afx_msg void OnDestroy();
 	afx_msg void OnBnClickedButtonSetParams();
+	afx_msg void OnBnClickedButtonSkywLine();
 };

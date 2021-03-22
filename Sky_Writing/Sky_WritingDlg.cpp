@@ -64,6 +64,7 @@ BEGIN_MESSAGE_MAP(CSky_WritingDlg, CDialog)
 	//}}AFX_MSG_MAP
 	ON_WM_DESTROY()
 	ON_BN_CLICKED(IDC_BUTTON_SET_PARAMS, &CSky_WritingDlg::OnBnClickedButtonSetParams)
+	ON_BN_CLICKED(IDC_BUTTON_SKYW_LINE, &CSky_WritingDlg::OnBnClickedButtonSkywLine)
 END_MESSAGE_MAP()
 
 
@@ -219,5 +220,18 @@ void CSky_WritingDlg::OnBnClickedButtonSetParams()
 	// Defining the end of the list and the end of command transfer to the RTC5 Board
 	set_end_of_list();
 	// Execute the list commands for initialization
+	execute_list(1);
+}
+
+void CSky_WritingDlg::OnBnClickedButtonSkywLine()
+{
+	set_start_list(1);
+	// set_sky_writing_para_list(const double Timelag, const long LaserOnShift, const UINT Nprev, const UINT Npost);
+	// set_sky_writing_mode(const UINT Mode);
+	jump_abs(0, 0);
+	// A jump delay is automatically inserted after the jump.
+	laser_on_list(5); // Turning on the laser control signals for 50 £gs
+	set_end_of_list();
+	// Starting the transferred list (and thereby the marking process)
 	execute_list(1);
 }
