@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "Sky_Writing.h"
 #include "Sky_WritingDlg.h"
+#include "math.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -48,6 +49,23 @@ END_MESSAGE_MAP()
 
 CSky_WritingDlg::CSky_WritingDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CSky_WritingDlg::IDD, pParent)
+	, m_u32Jump_delay(25)
+	, m_u32Mark_delay(10)
+	, m_u32Polygon_delay(5)
+	, m_dJumpSpeed(100.0)
+	, m_dMarkSpeed(50.0)
+	, m_u32HalfPeriod(100)
+	, m_u32PulseLength(50)
+	, m_LgLaserOnDelay(100)
+	, m_u32LaserOffDelay(100)
+	, m_dTimelag(50)
+	, m_LgLaserOnShift(10)
+	, m_u32Nprev(500)
+	, m_u32Npost(500)
+	, m_u32Mode(1)
+	, m_dCosAngle(0.49)
+	, m_u32Standby_HfPeriod(100)
+	, m_u32Standby_PlsLen(1)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -55,6 +73,24 @@ CSky_WritingDlg::CSky_WritingDlg(CWnd* pParent /*=NULL*/)
 void CSky_WritingDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
+	DDX_Text(pDX, IDC_EDIT_JUMP_DELAY, m_u32Jump_delay);
+	DDX_Text(pDX, IDC_EDIT_MARK_DELAY, m_u32Mark_delay);
+	DDX_Text(pDX, IDC_EDIT_POLY_DELAY, m_u32Polygon_delay);
+	DDX_Text(pDX, IDC_EDIT_JUMP_SPEED, m_dJumpSpeed);
+	DDX_Text(pDX, IDC_EDIT_MARK_SPEED, m_dMarkSpeed);
+	DDX_Text(pDX, IDC_EDIT_HALF_PERIOD, m_u32HalfPeriod);
+	DDX_Text(pDX, IDC_EDIT_PULSE_LENGTH, m_u32PulseLength);
+	DDX_Text(pDX, IDC_EDIT_LASER_ON_DELAY, m_LgLaserOnDelay);
+	DDX_Text(pDX, IDC_EDIT_LASER_OFF_DELAY, m_u32LaserOffDelay);
+	DDX_Text(pDX, IDC_EDIT_STANDBY_HALF_PERIOD, m_u32Standby_HfPeriod);
+	DDX_Text(pDX, IDC_EDIT_STANDBY_PULSE_LENGTH, m_u32Standby_PlsLen);
+	DDX_Text(pDX, IDC_EDIT_SKY_TIMELAG, m_dTimelag);
+	DDX_Text(pDX, IDC_EDIT_SKY_LASERON_SHIFT, m_LgLaserOnShift);
+	DDX_Text(pDX, IDC_EDIT_SKY_PRE, m_u32Nprev);
+	DDX_Text(pDX, IDC_EDIT_SKY_POST, m_u32Npost);
+	DDX_Text(pDX, IDC_EDIT_SKY_MODE, m_u32Mode);
+	DDX_Text(pDX, IDC_EDIT_SKY_ANGLE, m_dCosAngle);
+	DDX_Control(pDX, IDC_CHECK_SKY_LIST_FLAG, m_ckListFlag);
 }
 
 BEGIN_MESSAGE_MAP(CSky_WritingDlg, CDialog)
@@ -63,8 +99,10 @@ BEGIN_MESSAGE_MAP(CSky_WritingDlg, CDialog)
 	ON_WM_QUERYDRAGICON()
 	//}}AFX_MSG_MAP
 	ON_WM_DESTROY()
-	ON_BN_CLICKED(IDC_BUTTON_SET_PARAMS, &CSky_WritingDlg::OnBnClickedButtonSetParams)
 	ON_BN_CLICKED(IDC_BUTTON_SKYW_LINE, &CSky_WritingDlg::OnBnClickedButtonSkywLine)
+	ON_BN_CLICKED(IDC_BUTTON_SKYR_ARC, &CSky_WritingDlg::OnBnClickedButtonSkyrArc)
+	ON_BN_CLICKED(IDC_BUTTON_SET_SKY, &CSky_WritingDlg::OnBnClickedButtonSetSky)
+	ON_BN_CLICKED(IDC_CHECK_SKY_LIST_FLAG, &CSky_WritingDlg::OnBnClickedCheckSkyListFlag)
 END_MESSAGE_MAP()
 
 
@@ -98,7 +136,8 @@ BOOL CSky_WritingDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 設定小圖示
 
 	// TODO: 在此加入額外的初始設定
-
+	Scan_System_Initialization();
+	
 
 	return TRUE;  // 傳回 TRUE，除非您對控制項設定焦點
 }
@@ -157,81 +196,120 @@ void CSky_WritingDlg::OnDestroy()
 {
 	CDialog::OnDestroy();
 
-	// TODO: 在此加入您的訊息處理常式程式碼
+	write_8bit_port(0x00);
 	free_rtc5_dll();
 }
 
 void CSky_WritingDlg::Scan_System_Initialization()
 {
-	init_rtc5_dll();
+	m_XYRatio = 524288.0/50.0;
+	m_bListFlag = TRUE;
+	m_ckListFlag.SetCheck(m_bListFlag);
+	
+	UINT errcode;
+	errcode = init_rtc5_dll();
 
 	(void) select_rtc(1);
-	set_rtc4_mode();
+	set_rtc5_mode();
 	stop_execution();
 	load_program_file(NULL);
 
 	// Setting the CO2 laser mode
 	set_laser_mode(0);
-	// Setting and enabling the “laser active” laser control signals
-	set_laser_control(0x18); // All laser signals LOW active (Bit #3 and #4)
+
+	write_8bit_port(0x12);
 }
 
-void CSky_WritingDlg::OnBnClickedButtonSetParams()
+void CSky_WritingDlg::SetParams()
 {
-	// Opens List 1
-	set_start_list(1);
-	// Setting the standby pulses
-	set_standby(800, 8);
-	// In RTC4 compatibility mode the standby parameters are specified in units of 1/8 μs as with the RTC4 and the
-	// RTC5 multiplies the specified values by 8 to convert in integer-multiple of 1/64 μs.
-	// Half of the standby output period = 100 μs
-	// Pulse length of the standby pulses = 1 μs
-
-	// Timing, delay and speed preset
-
-	// Setting the scanner delays:
-	set_scanner_delays(25, 10, 5);
-	// Jump delay = 250 μs (specified in [10 μs])
-	// Mark delay = 100 μs (specified in [10 μs])
-	// Polygon delay = 50 μs (specified in [10 μs])
-	
-	// Setting the jump and marking speed:
-	set_jump_speed(1000.0);
-	set_mark_speed(250.0);
-	// In RTC4 compatibility mode the speed values are specified as with the RTC4 and the RTC5 multiplies the specified
-	// values by 16.
-	// Jump speed = 1000.0 bits/ms
-	// Marking speed = 250.0 bits/ms
-
-	// Setting the laser timing:
-	set_laser_pulses(800, 400);
-	// In RTC4 compatibility mode the timing parameters are specified in units of 1/8 μs as with the RTC4 and the RTC5
-	// multiplies the specified values by 8 to convert in integer-multiple of 1/64 μs.
-	// Laser HalfPeriod = 100 μs
-	// Laser PulseLength = 50 μs
-
-	// Setting the laser delays:
-	set_laser_delays(100, 100);
-	// In RTC4 compatibility mode the laser delays are specified in units of 1 μs as with the RTC4 and the RTC5
-	// multiplies the specified values by 2 to convert in integer-multiple of 0.5 μs.
-	// LaserOn delay = 100 μs
-	// LaserOff delay = 100 μs
-
-	// Defining the end of the list and the end of command transfer to the RTC5 Board
-	set_end_of_list();
-	// Execute the list commands for initialization
-	execute_list(1);
+	set_standby(m_u32Standby_HfPeriod * 64, m_u32Standby_PlsLen * 64);
+	set_scanner_delays(m_u32Jump_delay, m_u32Mark_delay, m_u32Polygon_delay);
+	set_jump_speed(m_dJumpSpeed * m_XYRatio / 1000.0);
+	set_mark_speed(m_dMarkSpeed * m_XYRatio / 1000.0);
+	set_laser_pulses(m_u32HalfPeriod * 64, m_u32PulseLength * 64);
+	set_laser_delays(m_LgLaserOnDelay * 2, m_u32LaserOffDelay * 2);
 }
 
 void CSky_WritingDlg::OnBnClickedButtonSkywLine()
 {
+	UpdateData(TRUE);
 	set_start_list(1);
-	// set_sky_writing_para_list(const double Timelag, const long LaserOnShift, const UINT Nprev, const UINT Npost);
-	// set_sky_writing_mode(const UINT Mode);
+	SetParams();
+	if (m_bListFlag)
+	{
+		SetSkyList();
+	}
+	jump_abs(m_XYRatio*(-10), m_XYRatio*(-10));
+	mark_abs(m_XYRatio*(-30), m_XYRatio*(-10));
+	mark_abs(m_XYRatio*(-30), m_XYRatio*(10));
+	mark_abs(m_XYRatio*(-10), m_XYRatio*(10));
+	mark_abs(m_XYRatio*(-10), m_XYRatio*(-10));
 	jump_abs(0, 0);
-	// A jump delay is automatically inserted after the jump.
-	laser_on_list(5); // Turning on the laser control signals for 50 μs
+	mark_abs(m_XYRatio*(10), m_XYRatio*(10*sqrt(3.0)));
+	mark_abs(m_XYRatio*(30), m_XYRatio*(10*sqrt(3.0)));
+	mark_abs(m_XYRatio*(40), 0);
+	mark_abs(m_XYRatio*(30), m_XYRatio*(-10*sqrt(3.0)));
+	mark_abs(m_XYRatio*(10), m_XYRatio*(-10*sqrt(3.0)));
+	mark_abs(0, 0);
 	set_end_of_list();
-	// Starting the transferred list (and thereby the marking process)
 	execute_list(1);
+}
+
+void CSky_WritingDlg::OnBnClickedButtonSkyrArc()
+{
+	UpdateData(TRUE);
+	set_start_list(1);
+	SetParams();
+	if (m_bListFlag)
+	{
+		SetSkyList();
+	}
+	jump_abs(m_XYRatio*(-40), 0);
+	arc_abs(m_XYRatio*(-20), 0, 180.0);
+	arc_abs(m_XYRatio*(20), 0, 180.0);
+	jump_abs(m_XYRatio*(-40), m_XYRatio*(-20));
+	arc_abs(m_XYRatio*(-20), m_XYRatio*(-20), 180.0);
+	arc_abs(m_XYRatio*(20), m_XYRatio*(-20), 180.0);
+	set_end_of_list();
+	execute_list(1);
+}
+
+void CSky_WritingDlg::SetSkyListFlag()
+{
+	if (m_ckListFlag.GetCheck() == BST_CHECKED)
+	{
+		m_bListFlag = TRUE;
+		GetDlgItem(IDC_BUTTON_SET_SKY)->EnableWindow(FALSE);
+	}
+	else
+	{
+		m_bListFlag = FALSE;
+		GetDlgItem(IDC_BUTTON_SET_SKY)->EnableWindow(TRUE);
+	}
+}
+
+void CSky_WritingDlg::SetSkyList()
+{
+	set_sky_writing_para_list(m_dTimelag, m_LgLaserOnShift * 2, m_u32Nprev, m_u32Npost);
+	set_sky_writing_mode_list(m_u32Mode);
+	if (m_u32Mode > 2)
+	{
+		set_sky_writing_limit_list(m_dCosAngle);
+	}
+}
+
+void CSky_WritingDlg::OnBnClickedButtonSetSky()
+{
+	UpdateData(TRUE);
+	set_sky_writing_para(m_dTimelag, m_LgLaserOnShift * 2, m_u32Nprev, m_u32Npost);
+	set_sky_writing_mode(m_u32Mode);
+	if (m_u32Mode > 2)
+	{
+		set_sky_writing_limit(m_dCosAngle);
+	}
+}
+
+void CSky_WritingDlg::OnBnClickedCheckSkyListFlag()
+{
+	SetSkyListFlag();
 }
