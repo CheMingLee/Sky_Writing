@@ -52,12 +52,12 @@ CSky_WritingDlg::CSky_WritingDlg(CWnd* pParent /*=NULL*/)
 	, m_u32Jump_delay(25)
 	, m_u32Mark_delay(10)
 	, m_u32Polygon_delay(5)
-	, m_dJumpSpeed(100.0)
-	, m_dMarkSpeed(50.0)
-	, m_u32HalfPeriod(100)
-	, m_u32PulseLength(50)
-	, m_LgLaserOnDelay(100)
-	, m_u32LaserOffDelay(100)
+	, m_dJumpSpeed(2000.0)
+	, m_dMarkSpeed(1000.0)
+	, m_u32HalfPeriod(25)
+	, m_u32PulseLength(20)
+	, m_LgLaserOnDelay(0)
+	, m_u32LaserOffDelay(0)
 	, m_dTimelag(50)
 	, m_LgLaserOnShift(10)
 	, m_u32Nprev(500)
@@ -103,6 +103,7 @@ BEGIN_MESSAGE_MAP(CSky_WritingDlg, CDialog)
 	ON_BN_CLICKED(IDC_BUTTON_SKYR_ARC, &CSky_WritingDlg::OnBnClickedButtonSkyrArc)
 	ON_BN_CLICKED(IDC_BUTTON_SET_SKY, &CSky_WritingDlg::OnBnClickedButtonSetSky)
 	ON_BN_CLICKED(IDC_CHECK_SKY_LIST_FLAG, &CSky_WritingDlg::OnBnClickedCheckSkyListFlag)
+	ON_BN_CLICKED(IDC_BUTTON_STOP, &CSky_WritingDlg::OnBnClickedButtonStop)
 END_MESSAGE_MAP()
 
 
@@ -202,7 +203,7 @@ void CSky_WritingDlg::OnDestroy()
 
 void CSky_WritingDlg::Scan_System_Initialization()
 {
-	m_XYRatio = 524288.0/50.0;
+	m_XYRatio = 524288.0/60.0;
 	m_bListFlag = TRUE;
 	m_ckListFlag.SetCheck(m_bListFlag);
 	
@@ -245,11 +246,11 @@ void CSky_WritingDlg::OnBnClickedButtonSkywLine()
 	mark_abs(m_XYRatio*(-10), m_XYRatio*(10));
 	mark_abs(m_XYRatio*(-10), m_XYRatio*(-10));
 	jump_abs(0, 0);
-	mark_abs(m_XYRatio*(10), m_XYRatio*(10*sqrt(3.0)));
-	mark_abs(m_XYRatio*(30), m_XYRatio*(10*sqrt(3.0)));
-	mark_abs(m_XYRatio*(40), 0);
-	mark_abs(m_XYRatio*(30), m_XYRatio*(-10*sqrt(3.0)));
-	mark_abs(m_XYRatio*(10), m_XYRatio*(-10*sqrt(3.0)));
+	mark_abs(m_XYRatio*(5), m_XYRatio*(5*sqrt(3.0)));
+	mark_abs(m_XYRatio*(15), m_XYRatio*(5*sqrt(3.0)));
+	mark_abs(m_XYRatio*(20), 0);
+	mark_abs(m_XYRatio*(15), m_XYRatio*(-5*sqrt(3.0)));
+	mark_abs(m_XYRatio*(5), m_XYRatio*(-5*sqrt(3.0)));
 	mark_abs(0, 0);
 	set_end_of_list();
 	execute_list(1);
@@ -264,12 +265,12 @@ void CSky_WritingDlg::OnBnClickedButtonSkyrArc()
 	{
 		SetSkyList();
 	}
-	jump_abs(m_XYRatio*(-40), 0);
-	arc_abs(m_XYRatio*(-20), 0, 180.0);
-	arc_abs(m_XYRatio*(20), 0, 180.0);
-	jump_abs(m_XYRatio*(-40), m_XYRatio*(-20));
-	arc_abs(m_XYRatio*(-20), m_XYRatio*(-20), 180.0);
-	arc_abs(m_XYRatio*(20), m_XYRatio*(-20), 180.0);
+	jump_abs(m_XYRatio*(-20), 0);
+	arc_abs(m_XYRatio*(-10), 0, 180.0);
+	arc_abs(m_XYRatio*(10), 0, 180.0);
+	jump_abs(m_XYRatio*(-20), m_XYRatio*(-10));
+	arc_abs(m_XYRatio*(-10), m_XYRatio*(-10), 180.0);
+	arc_abs(m_XYRatio*(10), m_XYRatio*(-10), 180.0);
 	set_end_of_list();
 	execute_list(1);
 }
@@ -312,4 +313,9 @@ void CSky_WritingDlg::OnBnClickedButtonSetSky()
 void CSky_WritingDlg::OnBnClickedCheckSkyListFlag()
 {
 	SetSkyListFlag();
+}
+
+void CSky_WritingDlg::OnBnClickedButtonStop()
+{
+	stop_execution();
 }

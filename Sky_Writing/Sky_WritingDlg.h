@@ -53,4 +53,5 @@ public:
 	CButton m_ckListFlag;
 	afx_msg void OnBnClickedButtonSetSky();
 	afx_msg void OnBnClickedCheckSkyListFlag();
+	afx_msg void OnBnClickedButtonStop();
 };
